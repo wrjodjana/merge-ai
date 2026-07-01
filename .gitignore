@@ -1,9 +1,13 @@
+
+# Frontend
 frontend/.DS_Store
 frontend/.env
 frontend/node_modules/
-
-# React Router
 frontend/.react-router/
 frontend/build/
 
+# Backend
+backend/node_modules/
+backend/.env
+# Misc
 CLAUDE.md

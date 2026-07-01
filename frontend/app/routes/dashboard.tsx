@@ -1,17 +1,35 @@
 import FilterButton from "~/components/filterButton";
 import Row from "~/components/row";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+type PRStatus = "open" | "merged" | "closed";
+
+interface PullRequest {
+  status: PRStatus;
+  title: string;
+  id: number;
+  author: string;
+  created_at: string;
+}
 
 export default function Dashboard() {
   const [selectedTag, setSelectedTag] = useState("All");
+  const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
 
-  const prs = [
-    { id: 142, title: "Add retry logic to failed card charges", status: "open" as const, author: "mrodriguez", time: "2 days ago" },
-    { id: 143, title: "Fix null check in webhook handler", status: "merged" as const, author: "warren", time: "5 hours ago" },
-    { id: 144, title: "Checking for bugs in reactjs hook", status: "closed" as const, author: "joey", time: "3 hours ago" },
-  ];
+  useEffect(() => {
+    async function fetchPrs() {
+      try {
+        const response = await fetch("http://127.0.0.1:3000/pull_requests");
+        const data = await response.json();
+        setPullRequests(data);
+      } catch (e) {
+        console.error("Error fetching pull requests", e);
+      }
+    }
+    fetchPrs();
+  }, []);
 
-  const filteredPrs = prs.filter((pr) => {
+  const filteredPrs = pullRequests.filter((pr) => {
     if (selectedTag === "All") {
       return true;
     }
@@ -33,7 +51,7 @@ export default function Dashboard() {
         </div>
       </div>
       {filteredPrs.map((pr) => (
-        <Row key={pr.id} id={pr.id} title={pr.title} status={pr.status} author={pr.author} time={pr.time} />
+        <Row key={pr.id} id={pr.id} title={pr.title} status={pr.status} author={pr.author} time={pr.created_at} />
       ))}
     </div>
   );
