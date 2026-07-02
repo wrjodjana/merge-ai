@@ -27,7 +27,17 @@ app.get("/pull_requests", async (req, res) => {
     const pull_requests = await pool.query(query);
     return res.json(pull_requests.rows);
   } catch (e) {
-    return res.status(500).json({ error: "Failed to fetch pull requests!" });
+    return res.status(500).json({ error: "Failed to get pull requests!" });
+  }
+});
+
+app.delete("/pull_requests", async (req, res) => {
+  try {
+    const query = "TRUNCATE TABLE pull_requests";
+    await pool.query(query);
+    return res.status(200).json({ message: "Successfully deleted pull_requests!" });
+  } catch (e) {
+    return res.status(500).json({ error: "Failed to delete pull requests!" });
   }
 });
 
@@ -42,7 +52,7 @@ function checkStatus(state: string, merged_at: string | null) {
   return "open";
 }
 
-app.get("/github", async (req, res) => {
+app.post("/pull_requests/sync", async (req, res) => {
   try {
     const headers = { "User-Agent": "merge-ai", Accept: "application/vnd.github+json" };
     const response = await fetch(`https://api.github.com/repos/${req.query.owner}/${req.query.repo}/pulls?state=all`, {
@@ -59,9 +69,9 @@ app.get("/github", async (req, res) => {
       const values = [pr.number, pr.title, checkStatus(pr.state, pr.merged_at), pr.user.login, pr.created_at];
       await pool.query(query, values);
     }
-    return res.status(201).json({ synced: prs.length });
+    return res.status(201).json({ message: "Successfully connected to github!" });
   } catch (e) {
-    return res.status(500).json({ error: "Failed to connect to github" });
+    return res.status(500).json({ error: "Failed to connect to github!" });
   }
 });
 

@@ -9,7 +9,7 @@ export default function Main() {
 
   async function handleSync(owner: string, repo: string) {
     try {
-      await fetch(`http://127.0.0.1:3000/github?owner=${owner}&repo=${repo}`);
+      await fetch(`http://127.0.0.1:3000/pull_requests/sync?owner=${owner}&repo=${repo}`, { method: "POST" });
       navigate("/dashboard");
     } catch (e) {
       console.error("Error posting git information", e);
@@ -33,7 +33,7 @@ export default function Main() {
           <input value={repo} onChange={(e) => setRepo(e.target.value)} type="text" className="border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-black" />
         </div>
         <button onClick={() => handleSync(owner, repo)} className="w-fit h-10 border border-black rounded-md px-3 py-2 hover:text-black text-gray-400">
-          Sync Pull Requests
+          Connect Repository
         </button>
       </div>
     </div>
