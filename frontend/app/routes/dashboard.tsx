@@ -1,6 +1,7 @@
-import FilterButton from "~/components/filterButton";
-import Row from "~/components/row";
+import FilterButton from "~/components/dashboard/filterButton";
+import Row from "~/components/dashboard/row";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 
 type PRStatus = "open" | "merged" | "closed";
 
@@ -16,17 +17,21 @@ export default function Dashboard() {
   const [selectedTag, setSelectedTag] = useState("All");
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
 
+  const navigate = useNavigate();
+
   useEffect(() => {
-    async function fetchPrs() {
+    async function fetchPRs() {
       try {
-        const response = await fetch("http://127.0.0.1:3000/pull_requests");
+        const response = await fetch("http://127.0.0.1:3000/pull_requests", { method: "GET" });
         const data = await response.json();
         setPullRequests(data);
+
+        console.log("Successfully added pull requests!");
       } catch (e) {
         console.error("Error fetching pull requests", e);
       }
     }
-    fetchPrs();
+    fetchPRs();
   }, []);
 
   const filteredPrs = pullRequests.filter((pr) => {
@@ -36,12 +41,24 @@ export default function Dashboard() {
     return pr.status === selectedTag.toLowerCase();
   });
 
+  async function deletePRs() {
+    try {
+      await fetch("http://127.0.0.1:3000/pull_requests", { method: "DELETE" });
+      navigate("/main");
+      console.log("Successfully deleted pull requests!");
+    } catch (e) {
+      console.error("Error deleting pull requests", e);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-row justify-between items-center px-4 py-4 border-b border-gray-200">
-        <div>
+        <div className="flex flex-row items-center space-x-4">
           <h1 className="text-lg font-medium">Pull Requests</h1>
-          <p className="text-sm text-gray-500">merge-ai/frontend</p>
+          <div className="w-fit h-10 border border-black rounded-md px-3 py-2 hover:text-black text-gray-400">
+            <button onClick={() => deletePRs()}>Disconnect Repository</button>
+          </div>
         </div>
         <div className="flex flex-row space-x-4">
           <FilterButton status="All" isActive={selectedTag === "All"} onClick={() => setSelectedTag("All")} />
