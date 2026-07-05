@@ -2,7 +2,6 @@ import FilterButton from "~/components/dashboard/filterButton";
 import Row from "~/components/dashboard/row";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import type { Route } from "./+types/dashboard";
 
 type prStatus = "open" | "merged" | "closed";
 
@@ -14,7 +13,7 @@ interface PullRequest {
   created_at: string;
 }
 
-export default function Dashboard({ params }: Route.ComponentProps) {
+export default function Dashboard() {
   const [selectedTag, setSelectedTag] = useState("All");
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
 
@@ -54,7 +53,7 @@ export default function Dashboard({ params }: Route.ComponentProps) {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="flex flex-row justify-between items-center px-4 py-4 border-b border-gray-200">
+      <div className="flex flex-row justify-between items-center px-4 py-4">
         <div className="flex flex-row items-center space-x-4">
           <h1 className="text-lg font-medium">Pull Requests</h1>
           <div className="w-fit h-10 border border-black rounded-md px-3 py-2 hover:text-black text-gray-400">
@@ -69,7 +68,7 @@ export default function Dashboard({ params }: Route.ComponentProps) {
         </div>
       </div>
       {filteredPRs.map((pr) => (
-        <Row key={pr.id} id={pr.id} title={pr.title} status={pr.status} author={pr.author} time={pr.created_at} owner={params.owner} repo={params.repo} />
+        <Row key={pr.id} id={pr.id} title={pr.title} status={pr.status} author={pr.author} time={pr.created_at} />
       ))}
     </div>
   );
