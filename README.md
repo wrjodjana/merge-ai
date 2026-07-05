@@ -1,2 +1,3 @@
-# merge-ai
+# Prism AI
+
 AI-native PR platform
