@@ -132,6 +132,16 @@ app.get("/updates/:owner/:repo", async (req, res) => {
   }
 });
 
+app.delete("/updates", async (req, res) => {
+  try {
+    const query = "TRUNCATE TABLE updates_entries";
+    await pool.query(query);
+    return res.status(200).json({ message: "Successfully deleted updates!" });
+  } catch (e) {
+    return res.status(500).json({ error: "Failed to delete updates!" });
+  }
+});
+
 app.get("/pull_requests", async (req, res) => {
   try {
     const query = "SELECT * FROM pull_requests;";
