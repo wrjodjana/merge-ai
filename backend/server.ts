@@ -19,6 +19,7 @@ const pool = new Pool({
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const EXPRESS_PORT = 3001;
 const GITHUB_HEADERS = {
@@ -37,7 +38,6 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-// customer-facing requests
 app.post("/sync/:owner/:repo", async (req, res) => {
   try {
     const { owner, repo } = req.params;
@@ -62,10 +62,8 @@ app.post("/sync/:owner/:repo", async (req, res) => {
       page++;
     }
 
-    // filter only at merged_at != null
     const merged = pullRequests.filter((pr: PullRequest) => pr.merged_at !== null);
 
-    // batch merge requests
     const batched = merged.map((pr: PullRequest) => ({
       number: pr.number,
       title: pr.title,
@@ -114,31 +112,149 @@ app.post("/sync/:owner/:repo", async (req, res) => {
     }
     const result = JSON.parse(block.text);
 
-    const query = `INSERT INTO updates_entries (owner, repo, number, headline, description, tag, merged_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7) 
-                ON CONFLICT (owner, repo, number) 
-                DO UPDATE SET headline=EXCLUDED.headline, description=EXCLUDED.description, tag=EXCLUDED.tag, merged_at=EXCLUDED.merged_at`;
-
-    for (const s of result.summaries) {
-      const values = [owner, repo, s.number, s.headline, s.description, s.tag, s.merged_at];
-      await pool.query(query, values);
+    const prByNumber = new Map<number, { title: string; body: string | null }>();
+    for (const pr of batched) {
+      prByNumber.set(pr.number, { title: pr.title, body: pr.body });
     }
 
-    return res.status(201).json({ message: "Successfully summarized PRs and added to Postgres!" });
+    const query = `INSERT INTO updates_entries (owner, repo, number, headline, description, tag, merged_at, pr_title, pr_body, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'draft')
+                ON CONFLICT (owner, repo, number)
+                DO NOTHING`;
+
+    let drafted = 0;
+    for (const s of result.summaries) {
+      const pr = prByNumber.get(s.number);
+      const values = [owner, repo, s.number, s.headline, s.description, s.tag, s.merged_at, pr ? pr.title : null, pr ? pr.body : null];
+      const insertResponse = await pool.query(query, values);
+      drafted += insertResponse.rowCount ?? 0;
+    }
+
+    return res.status(201).json({ message: "Successfully summarized PRs and added to Postgres!", drafted });
   } catch (e) {
     return res.status(500).json({ error: "Failed to generate updates!" });
   }
 });
 
+const VALID_TAGS = ["new", "improved", "fixed", "internal"];
+const VALID_STATUSES = ["draft", "published", "discarded"];
+
 app.get("/updates/:owner/:repo", async (req, res) => {
   try {
     const { owner, repo } = req.params;
+    const { status } = req.query;
+
+    if (status !== undefined && !VALID_STATUSES.includes(status as string)) {
+      return res.status(400).json({ error: "Invalid status!" });
+    }
+
+    if (status) {
+      const query = "SELECT * FROM updates_entries WHERE owner=$1 AND repo=$2 AND status=$3 ORDER BY merged_at DESC";
+      const values = [owner, repo, status];
+      const response = await pool.query(query, values);
+      return res.json(response.rows);
+    }
+
     const query = "SELECT * FROM updates_entries WHERE owner=$1 AND repo=$2 ORDER BY merged_at DESC";
     const values = [owner, repo];
     const response = await pool.query(query, values);
     return res.json(response.rows);
   } catch (e) {
     return res.status(500).json({ error: "Failed to fetch entries!" });
+  }
+});
+
+app.patch("/updates/:owner/:repo", async (req, res) => {
+  try {
+    const { owner, repo } = req.params;
+    const body = req.body ?? {};
+
+    if (!Array.isArray(body.numbers) || body.numbers.length === 0 || !body.numbers.every((n: unknown) => typeof n === "number")) {
+      return res.status(400).json({ error: "Invalid numbers!" });
+    }
+
+    if (!VALID_STATUSES.includes(body.status)) {
+      return res.status(400).json({ error: "Invalid status!" });
+    }
+
+    const query = "UPDATE updates_entries SET status=$1 WHERE owner=$2 AND repo=$3 AND number = ANY($4::int[]) RETURNING number";
+    const values = [body.status, owner, repo, body.numbers];
+    const response = await pool.query(query, values);
+    return res.json({ updated: response.rowCount ?? 0 });
+  } catch (e) {
+    return res.status(500).json({ error: "Failed to update entries!" });
+  }
+});
+
+app.patch("/updates/:owner/:repo/:number", async (req, res) => {
+  try {
+    const { owner, repo, number } = req.params;
+    const body = req.body ?? {};
+
+    const fields: string[] = [];
+    const values: (string | number)[] = [];
+
+    if (body.headline !== undefined) {
+      if (typeof body.headline !== "string" || body.headline.trim() === "") {
+        return res.status(400).json({ error: "Invalid headline!" });
+      }
+      values.push(body.headline);
+      fields.push(`headline=$${values.length}`);
+    }
+
+    if (body.description !== undefined) {
+      if (typeof body.description !== "string") {
+        return res.status(400).json({ error: "Invalid description!" });
+      }
+      values.push(body.description);
+      fields.push(`description=$${values.length}`);
+    }
+
+    if (body.tag !== undefined) {
+      if (!VALID_TAGS.includes(body.tag)) {
+        return res.status(400).json({ error: "Invalid tag!" });
+      }
+      values.push(body.tag);
+      fields.push(`tag=$${values.length}`);
+    }
+
+    if (body.status !== undefined) {
+      if (!VALID_STATUSES.includes(body.status)) {
+        return res.status(400).json({ error: "Invalid status!" });
+      }
+      values.push(body.status);
+      fields.push(`status=$${values.length}`);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: "No valid fields to update!" });
+    }
+
+    values.push(owner);
+    values.push(repo);
+    values.push(Number(number));
+    const query = `UPDATE updates_entries SET ${fields.join(", ")} WHERE owner=$${values.length - 2} AND repo=$${values.length - 1} AND number=$${values.length} RETURNING *`;
+    const response = await pool.query(query, values);
+
+    if (response.rowCount === 0) {
+      return res.status(404).json({ error: "Entry not found!" });
+    }
+
+    return res.json(response.rows[0]);
+  } catch (e) {
+    return res.status(500).json({ error: "Failed to update entry!" });
+  }
+});
+
+app.delete("/updates/:owner/:repo", async (req, res) => {
+  try {
+    const { owner, repo } = req.params;
+    const query = "DELETE FROM updates_entries WHERE owner=$1 AND repo=$2";
+    const values = [owner, repo];
+    await pool.query(query, values);
+    return res.status(200).json({ message: "Successfully deleted updates!" });
+  } catch (e) {
+    return res.status(500).json({ error: "Failed to delete updates!" });
   }
 });
 

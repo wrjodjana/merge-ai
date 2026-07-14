@@ -23,6 +23,7 @@ export default function Updates() {
   const encodedRepo = encodeURIComponent(repo as string);
 
   const [updates, setUpdates] = useState<Update[]>([]);
+  const [draftCount, setDraftCount] = useState(0);
   const [selectedTag, setSelectedTag] = useState<FilterTag>("All");
 
   const navigate = useNavigate();
@@ -30,10 +31,14 @@ export default function Updates() {
   useEffect(() => {
     async function fetchUpdates() {
       try {
-        const response = await fetch(`http://127.0.0.1:3001/updates/${encodedOwner}/${encodedRepo}`, { method: "GET" });
+        const response = await fetch(`http://127.0.0.1:3001/updates/${encodedOwner}/${encodedRepo}?status=published`, { method: "GET" });
         const updates = await response.json();
         const filteredData = updates.filter((d: any) => d.tag !== "internal").map((d: any) => ({ ...d, merged_at: new Date(d.merged_at) }));
         setUpdates(filteredData);
+
+        const draftResponse = await fetch(`http://127.0.0.1:3001/updates/${encodedOwner}/${encodedRepo}?status=draft`, { method: "GET" });
+        const drafts = await draftResponse.json();
+        setDraftCount(drafts.length);
 
         console.log("Successfully added updates!");
       } catch (e) {
@@ -77,7 +82,7 @@ export default function Updates() {
 
   async function deleteUpdates() {
     try {
-      await fetch("http://127.0.0.1:3001/updates", { method: "DELETE" });
+      await fetch(`http://127.0.0.1:3001/updates/${encodedOwner}/${encodedRepo}`, { method: "DELETE" });
       navigate("/main");
     } catch (e) {
       console.error("Failed to delete updates!", e);
@@ -88,9 +93,16 @@ export default function Updates() {
     <div className="max-w-4xl mx-auto">
       <div className="flex flex-row justify-between items-center px-4 py-4">
         <h1 className="text-4xl font-medium">Product Updates</h1>
-        <button onClick={() => deleteUpdates()} className="h-10 border border-black rounded-md px-3 py-2 text-sm hover:text-black text-gray-400">
-          Disconnect Repository
-        </button>
+        <div className="flex flex-row gap-3">
+          {draftCount > 0 && (
+            <button onClick={() => navigate(`/updates/${encodedOwner}/${encodedRepo}/review`)} className="h-10 border border-black rounded-md px-3 py-2 text-sm hover:text-black text-gray-400">
+              Review Drafts ({draftCount})
+            </button>
+          )}
+          <button onClick={() => deleteUpdates()} className="h-10 border border-black rounded-md px-3 py-2 text-sm hover:text-black text-gray-400">
+            Disconnect Repository
+          </button>
+        </div>
       </div>
       <div className="flex flex-row gap-3 px-4 pb-4">
         {FilterTags.map((tag) => (

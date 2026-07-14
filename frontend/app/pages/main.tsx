@@ -15,7 +15,7 @@ export default function Main() {
       const encodedOwner = encodeURIComponent(owner);
       const encodedRepo = encodeURIComponent(repo);
       await fetch(`http://127.0.0.1:3001/sync/${encodedOwner}/${encodedRepo}`, { method: "POST" });
-      navigate(`/updates/${encodedOwner}/${encodedRepo}`);
+      navigate(`/updates/${encodedOwner}/${encodedRepo}/review`);
     } catch (e) {
       console.error("Error posting git information", e);
       setIsLoading(false);
