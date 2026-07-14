@@ -3,7 +3,7 @@ import type { EntryTag } from "~/components/updates/entry/pill";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useNavigate } from "react-router";
-import FilterButton from "~/components/filterButton";
+import FilterButton, { type FilterTag } from "~/components/updates/filterButton";
 
 interface Update {
   owner: string;
@@ -15,13 +15,15 @@ interface Update {
   merged_at: string;
 }
 
+const FilterTags: FilterTag[] = ["All", "New", "Improved", "Fixed"];
+
 export default function Updates() {
   const { owner, repo } = useParams();
   const encodedOwner = encodeURIComponent(owner as string);
   const encodedRepo = encodeURIComponent(repo as string);
 
   const [updates, setUpdates] = useState<Update[]>([]);
-  const [selectedTag, setSelectedTag] = useState("All");
+  const [selectedTag, setSelectedTag] = useState<FilterTag>("All");
 
   const navigate = useNavigate();
 
@@ -65,11 +67,10 @@ export default function Updates() {
           Disconnect Repository
         </button>
       </div>
-      <div className="flex flex-row space-x-4">
-        <FilterButton tag="All" isActive={selectedTag === "All"} onClick={() => setSelectedTag("All")} />
-        <FilterButton tag="New" isActive={selectedTag === "New"} onClick={() => setSelectedTag("New")} />
-        <FilterButton tag="Improved" isActive={selectedTag === "Improved"} onClick={() => setSelectedTag("Improved")} />
-        <FilterButton tag="Fixed" isActive={selectedTag === "Fixed"} onClick={() => setSelectedTag("Fixed")} />
+      <div className="flex flex-row gap-3 px-4 pb-4">
+        {FilterTags.map((tag) => (
+          <FilterButton key={tag} tag={tag} isActive={selectedTag === tag} onClick={() => setSelectedTag(tag)} />
+        ))}
       </div>
       <div className="flex flex-col gap-4 px-4">
         {filteredUpdates.map((u) => (

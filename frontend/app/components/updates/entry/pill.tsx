@@ -10,7 +10,7 @@ const labelMap: Record<EntryTag, string> = {
   fixed: "Fixed",
 };
 
-const colorMap: Record<EntryTag, string> = {
+export const colorMap: Record<EntryTag, string> = {
   new: "bg-green-100 text-green-800",
   improved: "bg-blue-100 text-blue-800",
   fixed: "bg-violet-100 text-violet-800",
