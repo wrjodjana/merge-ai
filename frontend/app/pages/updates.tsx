@@ -66,6 +66,15 @@ export default function Updates() {
     return Array.from(groups, ([month, entries]) => ({ month, entries }));
   }
 
+  const monthGroups = groupByMonth(selectedUpdates);
+
+  function tagCount(tag: FilterTag) {
+    if (tag == "All") {
+      return updates.length;
+    }
+    return updates.filter((u) => u.tag === tag.toLowerCase()).length;
+  }
+
   async function deleteUpdates() {
     try {
       await fetch("http://127.0.0.1:3001/updates", { method: "DELETE" });
@@ -85,18 +94,29 @@ export default function Updates() {
       </div>
       <div className="flex flex-row gap-3 px-4 pb-4">
         {FilterTags.map((tag) => (
-          <FilterButton key={tag} tag={tag} isActive={selectedTag === tag} onClick={() => setSelectedTag(tag)} />
+          <FilterButton key={tag} tag={tag} count={tagCount(tag)} isActive={selectedTag === tag} onClick={() => setSelectedTag(tag)} />
         ))}
       </div>
-      <div className="flex flex-col gap-8 px-4 pb-8">
-        {groupByMonth(selectedUpdates).map(({ month, entries }) => (
-          <div key={month} className="flex flex-col gap-3">
-            <h2 className="text-lg font-medium text-gray-900">{month}</h2>
-            {entries.map((u) => (
-              <Entry key={u.number} headline={u.headline} description={u.description} tag={u.tag} />
+      <div className="flex flex-row gap-8 px-4 pb-8">
+        <div className="flex flex-1 flex-col gap-8">
+          {monthGroups.map(({ month, entries }) => (
+            <div key={month} id={month} className="flex flex-col gap-3 scroll-mt-8">
+              <h2 className="text-lg font-medium text-gray-900">{month}</h2>
+              {entries.map((u) => (
+                <Entry key={u.number} headline={u.headline} description={u.description} tag={u.tag} />
+              ))}
+            </div>
+          ))}
+        </div>
+        {monthGroups.length > 0 && (
+          <nav className="sticky top-8 hidden w-36 shrink-0 flex-col gap-1 self-start md:flex">
+            {monthGroups.map(({ month }) => (
+              <button key={month} onClick={() => document.getElementById(month)?.scrollIntoView({ behavior: "smooth" })} className="py-1 text-left text-sm text-gray-400 transition-colors hover:text-gray-900">
+                {month}
+              </button>
             ))}
-          </div>
-        ))}
+          </nav>
+        )}
       </div>
     </div>
   );

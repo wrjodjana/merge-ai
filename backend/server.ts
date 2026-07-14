@@ -41,16 +41,26 @@ app.get("/", (req, res) => {
 app.post("/sync/:owner/:repo", async (req, res) => {
   try {
     const { owner, repo } = req.params;
-    const githubResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls?state=closed&per_page=100`, {
-      headers: GITHUB_HEADERS,
-    });
-
-    if (!githubResponse.ok) {
-      return res.status(githubResponse.status).json({ error: "Failed to fetch pull requests!" });
-    }
-
     type PullRequest = Endpoints["GET /repos/{owner}/{repo}/pulls"]["response"]["data"][number];
-    const pullRequests = (await githubResponse.json()) as PullRequest[];
+
+    let pullRequests: PullRequest[] = [];
+    let page = 1;
+
+    while (true) {
+      if (page == 6) {
+        break;
+      }
+
+      const githubResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls?state=closed&per_page=100&page=${page}`, { headers: GITHUB_HEADERS });
+
+      if (!githubResponse.ok) {
+        return res.status(githubResponse.status).json({ error: "Failed to fetch pull requests!" });
+      }
+
+      const batch = (await githubResponse.json()) as PullRequest[];
+      pullRequests = pullRequests.concat(batch);
+      page++;
+    }
 
     // filter only at merged_at != null
     const merged = pullRequests.filter((pr: PullRequest) => pr.merged_at !== null);
@@ -66,7 +76,7 @@ app.post("/sync/:owner/:repo", async (req, res) => {
     const prompt = promptTemplate.replace(`{{pull_requests}}`, JSON.stringify(batched, null, 2));
 
     const modelResponse = await ANTHROPIC_CLIENT.messages.create({
-      max_tokens: 4096,
+      max_tokens: 16000,
       model: "claude-haiku-4-5",
       messages: [{ role: "user", content: prompt }],
       output_config: {
